@@ -1,0 +1,19 @@
+# Ignorar o ambiente virtual
+venv/
+
+# Ignorar arquivos gerados pelo PyInstaller
+*.spec
+dist/
+build/
+
+# Ignorar caches do Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignorar logs e arquivos temporários
+*.log
+*.tmp
+
+# Ignorar arquivos do Excel gerados
+output/*.xlsx
