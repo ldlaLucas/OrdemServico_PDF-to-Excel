@@ -1,78 +1,55 @@
-import os
-import PyPDF2
-import re
-import pandas as pd
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from extractor import extrair_dados_pdf
+from file_handler import salvar_dados_excel
 
-def extract_text_from_pdf(pdf_path):
-    """ Extrai o texto de todas as páginas do PDF. """
-    with open(pdf_path, "rb") as file:
-        reader = PyPDF2.PdfReader(file)
-        full_text = ""
-
-        # Percorre todas as páginas
-        for page in reader.pages:
-            full_text += page.extract_text() + "\n"  # Adiciona quebra de linha entre páginas
-
-    return full_text
-
-def extract_fields(text):
-    """ Extrai os campos desejados do texto do PDF. """
-    os_number = re.search(r"N° da OS:\s*(\d+)", text)
-    setor = re.search(r"Setor:\s*([\w\s]+)", text)
-    aberta = re.search(r"Aberta em\s*(\d{2}/\d{2}/\d{4} \d{2}:\d{2})", text)
-    fechada = re.search(r"Fechada em\s*(\d{2}/\d{2}/\d{4} \d{2}:\d{2})", text)
-
-    # Captura "Observação" até encontrar a próxima seção (ex: "TÉCNICO RESPONSÁVEL")
-    observacao_match = re.search(r"Observação:(.*?)(?=\n(?:TÉCNICO RESPONSÁVEL|Nome:|$))", text, re.S)
-    observacao = observacao_match.group(1).strip() if observacao_match else "Não encontrado"
-
-    return {
-        "N° da OS": os_number.group(1) if os_number else "Não encontrado",
-        "Setor": setor.group(1).strip() if setor else "Não encontrado",
-        "Aberta em": aberta.group(1) if aberta else "Não encontrado",
-        "Fechada em": fechada.group(1) if fechada else "Não encontrado",
-        "Observação": observacao
-    }
-
-def process_pdf(pdf_path):
-    """ Processa o PDF e salva os dados em um arquivo Excel. """
-    text = extract_text_from_pdf(pdf_path)
-    fields = extract_fields(text)
-
-    df = pd.DataFrame([fields])
+def selecionar_arquivo():
+    """Abre uma janela para selecionar o arquivo PDF."""
+    arquivo_pdf = filedialog.askopenfilename(filetypes=[("Arquivos PDF", "*.pdf")])
     
-    # Pergunta onde salvar a planilha
-    save_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx")])
-    if save_path:
-        df.to_excel(save_path, index=False)
-        messagebox.showinfo("Sucesso", f"Planilha salva com sucesso!\n{save_path}")
-    else:
-        messagebox.showwarning("Cancelado", "Operação cancelada pelo usuário.")
+    if not arquivo_pdf:
+        return  # Se o usuário não selecionar nada, não faz nada
 
-def select_pdf():
-    """ Abre uma janela para selecionar um PDF. """
-    pdf_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
-    if pdf_path:
-        process_pdf(pdf_path)
-    else:
-        messagebox.showwarning("Cancelado", "Nenhum arquivo selecionado.")
+    try:
+        dados_extraidos = extrair_dados_pdf(arquivo_pdf)
 
-def create_gui():
-    """ Cria a interface gráfica para arrastar e soltar o PDF. """
-    root = tk.Tk()
-    root.title("Extrator de Dados de PDF")
+        if not dados_extraidos:
+            messagebox.showerror("Erro", "Nenhum dado foi extraído do PDF.")
+            return
+        
+        salvar_como(dados_extraidos)
+    
+    except Exception as e:
+        messagebox.showerror("Erro", f"Ocorreu um erro: {str(e)}")
 
-    label = tk.Label(root, text="Arraste e solte um PDF aqui ou clique para selecionar", pady=20)
-    label.pack()
+def salvar_como(dados):
+    """Permite ao usuário escolher o nome e o local do arquivo de saída."""
+    arquivo_saida = filedialog.asksaveasfilename(
+        defaultextension=".xlsx",
+        filetypes=[("Arquivo Excel", "*.xlsx")],
+        title="Salvar Arquivo",
+        initialfile="dados_extraidos.xlsx"
+    )
 
-    btn_select = tk.Button(root, text="Selecionar PDF", command=select_pdf)
-    btn_select.pack()
+    if arquivo_saida:
+        salvar_dados_excel(dados, arquivo_saida)
+        messagebox.showinfo("Sucesso", f"Arquivo salvo em:\n{arquivo_saida}")
 
-    root.mainloop()
+# Criando a interface gráfica com Tkinter
+root = tk.Tk()
+root.title("Extrator de Dados de PDF")
 
-if __name__ == "__main__":
-    create_gui()
+# Configurações de layout
+root.geometry("400x200")
+root.resizable(False, False)
 
+# Botão para selecionar arquivo PDF
+btn_selecionar = tk.Button(root, text="Selecionar PDF", command=selecionar_arquivo, height=2, width=20)
+btn_selecionar.pack(pady=20)
 
+# Rodapé
+lbl_credito = tk.Label(root, text="Desenvolvido por Lucas Augusto", fg="gray")
+lbl_credito.pack(side="bottom", pady=10)
+
+# Inicia o loop da interface gráfica
+root.mainloop()

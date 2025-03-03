@@ -1,32 +1,59 @@
-import PyPDF2
+import pdfplumber
 import re
 
-def extrair_dados_pdf(arquivo_pdf):
-    """Lê um PDF e extrai os campos necessários de todas as páginas."""
-    with open(arquivo_pdf, "rb") as pdf_file:
-        leitor = PyPDF2.PdfReader(pdf_file)
-        dados_extraidos = []
-
-        # Percorre todas as páginas do PDF
-        for pagina in leitor.pages:
+def extrair_dados_pdf(caminho_pdf):
+    dados_extraidos = []
+    
+    with pdfplumber.open(caminho_pdf) as pdf:
+        for pagina in pdf.pages:
             texto = pagina.extract_text()
+            if not texto:
+                continue
+            
+            linhas = texto.split("\n")
+            registro_atual = {}
 
-            # Expressões regulares para encontrar os dados
-            num_os = re.search(r"Nº da OS:\s*(\d+)", texto)
-            setor = re.search(r"Setor:\s*([\w\s]+)", texto)
-            aberta = re.search(r"Aberta em\s*([\d/:\s]+)", texto)
-            fechada = re.search(r"Fechada em\s*([\d/:\s]+)", texto)
-            observacao = re.search(r"Observação:\s*(.+)", texto)
+            for linha in linhas:
+                # Para a leitura ao encontrar "TÉCNICO RESPONSÁVEL"
+                if "TÉCNICO RESPONSÁVEL" in linha:
+                    break
 
-            # Criando um dicionário com os dados extraídos
-            dados = {
-                "Nº da OS": num_os.group(1) if num_os else "Não encontrado",
-                "Setor": setor.group(1) if setor else "Não encontrado",
-                "Aberta em": aberta.group(1).strip() if aberta else "Não encontrado",
-                "Fechada em": fechada.group(1).strip() if fechada else "Não encontrado",
-                "Observação": observacao.group(1).strip() if observacao else "Não encontrado"
-            }
+                # Detecta Nº da OS (começa um novo registro)
+                match_os = re.search(r"Nº da OS:\s*(\d{9})", linha)
+                if match_os:
+                    if registro_atual:
+                        dados_extraidos.append(registro_atual)
+                    registro_atual = {
+                        "Nº da OS": match_os.group(1),
+                        "Setor": "",
+                        "Aberta em": "",
+                        "Fechada em": "",
+                        "Observação": ""
+                    }
+                
+                # Captura Setor
+                match_setor = re.search(r"Setor:\s*(.+)", linha)
+                if match_setor:
+                    registro_atual["Setor"] = match_setor.group(1).strip()
+                
+                # Captura Datas (Melhoria na detecção)
+                match_aberta = re.search(r"Aberta em\s*([\d/]+\s[\d:]+)", linha)
+                match_fechada = re.search(r"Fechada em\s*([\d/]+\s[\d:]+)", linha)
 
-            dados_extraidos.append(dados)
+                if match_aberta:
+                    registro_atual["Aberta em"] = match_aberta.group(1)
+                
+                if match_fechada:
+                    registro_atual["Fechada em"] = match_fechada.group(1)
+
+                # Captura Observação (melhorando extração multilinha)
+                if "Observação:" in linha:
+                    registro_atual["Observação"] = linha.split("Observação:")[-1].strip()
+                elif registro_atual.get("Observação"):  # Continua extraindo caso seja multilinha
+                    registro_atual["Observação"] += " " + linha.strip()
+
+            # Adiciona o último registro, se houver
+            if registro_atual:
+                dados_extraidos.append(registro_atual)
 
     return dados_extraidos
