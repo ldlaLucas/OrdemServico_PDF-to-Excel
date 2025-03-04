@@ -34,14 +34,13 @@ Este é um aplicativo desenvolvido para extrair informações específicas de ar
 
 ```
 📂 ExtratorOS/
-├── 📂 app/                     # Código-fonte principal
-│   ├── main.py                 # Interface gráfica (Tkinter)
-│   ├── extractor.py             # Extração dos dados do PDF
-│   ├── file_handler.py          # Função para salvar em Excel
-│   ├── requirements.txt         # Dependências do projeto
-│   ├── README.md                # Documentação
 ├── 📂 dist/                     # Arquivos gerados pelo PyInstaller
 ├── 📂 build/                    # Arquivos temporários da build
+├── main.py                      # Interface gráfica (Tkinter)
+├── extractor.py                 # Extração dos dados do PDF
+├── file_handler.py              # Função para salvar em Excel
+├── requirements.txt             # Dependências do projeto
+├── README.md                    # Documentação
 └── .gitignore                   # Arquivos ignorados pelo Git
 ```
 
