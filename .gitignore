@@ -1,0 +1,18 @@
+# Arquivos temporários de build
+build/
+dist/
+
+# Ambiente virtual
+venv/
+
+# Arquivos do PyInstaller
+*.spec
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos e pastas específicos do editor
+.idea/
+.vscode/
+*.swp
