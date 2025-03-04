@@ -1,4 +1,6 @@
-PyPDF2
+tk
+pymupdf
 pandas
 openpyxl
-tk
+pillow
+pyinstaller

@@ -1,7 +1,6 @@
 import pandas as pd
 
-def salvar_dados_excel(dados, nome_arquivo="dados_extraidos.xlsx"):
+def save_to_excel(data, output_file="output.xlsx"):
     """Salva os dados extraídos em um arquivo Excel."""
-    df = pd.DataFrame(dados)  # Converte a lista de dicionários em DataFrame do Pandas
-    df.to_excel(nome_arquivo, index=False, engine='openpyxl')
-    print(f"Arquivo salvo como {nome_arquivo}")
+    df = pd.DataFrame(data, columns=["Nº da OS", "Setor", "Aberta em", "Fechada em", "Observação"])
+    df.to_excel(output_file, index=False)

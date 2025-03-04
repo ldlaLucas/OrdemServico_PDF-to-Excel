@@ -1,59 +1,46 @@
-import pdfplumber
+import fitz  # PyMuPDF
 import re
 
-def extrair_dados_pdf(caminho_pdf):
-    dados_extraidos = []
-    
-    with pdfplumber.open(caminho_pdf) as pdf:
-        for pagina in pdf.pages:
-            texto = pagina.extract_text()
-            if not texto:
-                continue
-            
-            linhas = texto.split("\n")
-            registro_atual = {}
+def extract_data(pdf_path):
+    """Extrai os campos necessários do PDF e suas coordenadas."""
+    doc = fitz.open(pdf_path)
+    extracted_info = []
 
-            for linha in linhas:
-                # Para a leitura ao encontrar "TÉCNICO RESPONSÁVEL"
-                if "TÉCNICO RESPONSÁVEL" in linha:
-                    break
+    for page in doc:
+        text = page.get_text("text")
+        
+        # Expressões regulares para capturar os campos
+        os_number = re.search(r"Nº da OS:\s*(\d+)", text)
+        setor_match = re.search(r"Setor:\s*(.*?)\s*Oficina:", text)
+        aberta_em = re.search(r"Aberta em (\d{2}/\d{2}/\d{4} \d{2}:\d{2})", text)
+        fechada_em = re.search(r"Fechada em (\d{2}/\d{2}/\d{4} \d{2}:\d{2})", text)
+        observacao_match = re.search(r"Observação:\s*(.*)", text, re.DOTALL)
 
-                # Detecta Nº da OS (começa um novo registro)
-                match_os = re.search(r"Nº da OS:\s*(\d{9})", linha)
-                if match_os:
-                    if registro_atual:
-                        dados_extraidos.append(registro_atual)
-                    registro_atual = {
-                        "Nº da OS": match_os.group(1),
-                        "Setor": "",
-                        "Aberta em": "",
-                        "Fechada em": "",
-                        "Observação": ""
-                    }
-                
-                # Captura Setor
-                match_setor = re.search(r"Setor:\s*(.+)", linha)
-                if match_setor:
-                    registro_atual["Setor"] = match_setor.group(1).strip()
-                
-                # Captura Datas (Melhoria na detecção)
-                match_aberta = re.search(r"Aberta em\s*([\d/]+\s[\d:]+)", linha)
-                match_fechada = re.search(r"Fechada em\s*([\d/]+\s[\d:]+)", linha)
+        # Ajuste do setor para remover informações extras
+        setor = setor_match.group(1).split(" Prioridade:")[0] if setor_match else ""
 
-                if match_aberta:
-                    registro_atual["Aberta em"] = match_aberta.group(1)
-                
-                if match_fechada:
-                    registro_atual["Fechada em"] = match_fechada.group(1)
+        # Capturar coordenadas dos campos
+        coords = {}
+        for field, regex in {
+            "Nº da OS": os_number,
+            "Setor": setor_match,
+            "Aberta em": aberta_em,
+            "Fechada em": fechada_em,
+            "Observação": observacao_match
+        }.items():
+            if regex:
+                rects = page.search_for(regex.group(0))
+                if rects:
+                    coords[field] = rects[0]
 
-                # Captura Observação (melhorando extração multilinha)
-                if "Observação:" in linha:
-                    registro_atual["Observação"] = linha.split("Observação:")[-1].strip()
-                elif registro_atual.get("Observação"):  # Continua extraindo caso seja multilinha
-                    registro_atual["Observação"] += " " + linha.strip()
+        # Salvar dados extraídos
+        extracted_info.append({
+            "Nº da OS": os_number.group(1) if os_number else "",
+            "Setor": setor,
+            "Aberta em": aberta_em.group(1) if aberta_em else "",
+            "Fechada em": fechada_em.group(1) if fechada_em else "",
+            "Observação": observacao_match.group(1).strip() if observacao_match else "",
+            "coords": coords  # Coordenadas para destaque visual
+        })
 
-            # Adiciona o último registro, se houver
-            if registro_atual:
-                dados_extraidos.append(registro_atual)
-
-    return dados_extraidos
+    return extracted_info
