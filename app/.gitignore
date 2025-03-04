@@ -1,19 +1,23 @@
-# Ignorar o ambiente virtual
-venv/
-
-# Ignorar arquivos gerados pelo PyInstaller
-*.spec
-dist/
-build/
-
-# Ignorar caches do Python
+# Python #
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
-# Ignorar logs e arquivos temporários
+# Virtual Environment #
+venv/
+.env/
+*.venv
+
+# Logs e Arquivos Temporários #
 *.log
 *.tmp
+*.bak
 
-# Ignorar arquivos do Excel gerados
-output/*.xlsx
+
+# Arquivos do Sistema #
+.DS_Store
+Thumbs.db
+
+# Configurações do VS Code #
+.vscode/
