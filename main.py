@@ -1,81 +1,178 @@
 import tkinter as tk
-from tkinter import filedialog, Canvas
-import fitz  # PyMuPDF
-from extractor import extract_data
-from file_handler import save_to_excel
+from tkinter import filedialog, messagebox, ttk
+from extractor import extrair_dados_pdf
+from file_handler import salvar_dados_excel
+import fitz
 from PIL import Image, ImageTk
+import threading
+import sys
 
-class PDFExtractorApp:
-    def __init__(self, root):
-        """Inicializa a interface do aplicativo."""
-        self.root = root
-        self.root.title("Extrator de Ordens de Serviço")
+sys.stdout.reconfigure(encoding='utf-8')
 
-        # Botão para selecionar PDF
-        self.btn_open = tk.Button(root, text="Selecionar PDF", command=self.open_pdf)
-        self.btn_open.pack(pady=10)
 
-        # Canvas para exibição do PDF
-        self.canvas = Canvas(root, width=600, height=800)
-        self.canvas.pack()
+# Criando a janela principal
+root = tk.Tk()
+root.title("Extrator de Ordens de Serviço")
+root.geometry("800x650")
+root.resizable(False, False)
 
-        # Botões de navegação
-        self.btn_prev = tk.Button(root, text="◀ Página Anterior", command=self.prev_page)
-        self.btn_prev.pack(side=tk.LEFT, padx=10)
+# Variáveis globais
+pdf_documento = None
+pagina_atual = 0
+imagens_paginas = []
+btn_extrair = None  # Inicialmente oculto
 
-        self.btn_next = tk.Button(root, text="▶ Próxima Página", command=self.next_page)
-        self.btn_next.pack(side=tk.RIGHT, padx=10)
+# Estilização dos botões
+btn_style = {
+    "font": ("Arial", 12, "bold"),
+    "bg": "#0078D7",
+    "fg": "white",
+    "activebackground": "#005A9E",
+    "bd": 2,
+    "relief": "raised"
+}
 
-        # Variáveis de controle do PDF
-        self.pdf_document = None
-        self.current_page = 0
+# Função para carregar o PDF e exibir a primeira página
+def selecionar_arquivo():
+    global pdf_documento, pagina_atual, imagens_paginas, btn_extrair
 
-    def open_pdf(self):
-        """Seleciona um arquivo PDF e exibe a primeira página."""
-        file_path = filedialog.askopenfilename(filetypes=[("Arquivos PDF", "*.pdf")])
-        if file_path:
-            self.pdf_document = fitz.open(file_path)
-            self.current_page = 0
-            self.display_page(self.current_page)
+    arquivo_pdf = filedialog.askopenfilename(filetypes=[("Arquivos PDF", "*.pdf")])
+    if not arquivo_pdf:
+        return
 
-            # Extração de dados
-            extracted_data = extract_data(file_path)
+    try:
+        pdf_documento = fitz.open(arquivo_pdf)
+        pagina_atual = 0
+        imagens_paginas = []
 
-            # Destaque dos campos na interface
-            self.highlight_fields(extracted_data)
+        for pagina in pdf_documento:
+            pix = pagina.get_pixmap()
+            imagem = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            imagens_paginas.append(imagem)
 
-            # Salvar no Excel
-            save_to_excel(extracted_data, "dados_extraidos.xlsx")
+        exibir_pagina()
+        status_label.config(text="PDF carregado com sucesso!", fg="green")
 
-    def display_page(self, page_number):
-        """Exibe a página selecionada do PDF na interface."""
-        if self.pdf_document:
-            page = self.pdf_document.load_page(page_number)
-            pix = page.get_pixmap()
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            img = img.resize((600, 800))
-            self.pdf_image = ImageTk.PhotoImage(img)
-            self.canvas.create_image(0, 0, anchor=tk.NW, image=self.pdf_image)
+        # Criar botão de extração após o carregamento, caso ainda não exista
+        if btn_extrair is None:
+            criar_botao_extrair()
 
-    def highlight_fields(self, extracted_data):
-        """Destaca os campos extraídos no PDF com um quadro vermelho."""
-        for field in extracted_data:
-            x, y, w, h = field['coords']
-            self.canvas.create_rectangle(x, y, x + w, y + h, outline="red", width=2)
+    except Exception as e:
+        messagebox.showerror("Erro", f"Falha ao carregar PDF: {e}")
 
-    def next_page(self):
-        """Vai para a próxima página do PDF."""
-        if self.pdf_document and self.current_page < len(self.pdf_document) - 1:
-            self.current_page += 1
-            self.display_page(self.current_page)
+# Função para exibir a página atual
+def exibir_pagina():
+    if not imagens_paginas:
+        return
 
-    def prev_page(self):
-        """Volta para a página anterior do PDF."""
-        if self.pdf_document and self.current_page > 0:
-            self.current_page -= 1
-            self.display_page(self.current_page)
+    imagem = imagens_paginas[pagina_atual]
+    imagem.thumbnail((700, 500))  # Ajuste para exibição
+    img_tk = ImageTk.PhotoImage(imagem)
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = PDFExtractorApp(root)
-    root.mainloop()
+    canvas.delete("all")
+    canvas.create_image(0, 0, anchor="nw", image=img_tk)
+    canvas.image = img_tk
+
+    label_pagina.config(text=f"Página {pagina_atual + 1} de {len(imagens_paginas)}")
+
+# Função para avançar página
+def proxima_pagina():
+    global pagina_atual
+    if pdf_documento and pagina_atual < len(imagens_paginas) - 1:
+        pagina_atual += 1
+        exibir_pagina()
+
+# Função para voltar página
+def pagina_anterior():
+    global pagina_atual
+    if pdf_documento and pagina_atual > 0:
+        pagina_atual -= 1
+        exibir_pagina()
+
+# Função para criar o botão "Extrair Dados"
+def criar_botao_extrair():
+    global btn_extrair
+    btn_extrair = tk.Button(root, text="Extrair Dados", command=extrair_dados, **btn_style)
+    btn_extrair.pack(pady=10)
+
+# Função para extrair os dados do PDF
+def extrair_dados():
+    if not pdf_documento:
+        messagebox.showwarning("Aviso", "Nenhum PDF carregado!")
+        return
+
+    status_label.config(text="Extraindo dados...", fg="blue")
+    progress_bar.start(10)
+
+    def processar():
+        try:
+            print("📥 Iniciando extração...")
+            dados_extraidos = extrair_dados_pdf(pdf_documento)
+
+            if not dados_extraidos:
+                print("❌ Nenhum dado extraído")
+                messagebox.showerror("Erro", "Nenhum dado foi extraído do PDF.")
+                status_label.config(text="Erro ao extrair dados!", fg="red")
+                return
+            
+            print(f"✅ Dados extraídos: {dados_extraidos}")
+            salvar_como(dados_extraidos)
+
+        except Exception as e:
+            print(f"❌ Erro na extração: {str(e)}")
+            messagebox.showerror("Erro", f"Ocorreu um erro: {str(e)}")
+            status_label.config(text="Erro ao extrair dados!", fg="red")
+
+        finally:
+            progress_bar.stop()
+
+    threading.Thread(target=processar).start()
+
+# Função para salvar o arquivo Excel
+def salvar_como(dados):
+    arquivo_saida = filedialog.asksaveasfilename(
+        defaultextension=".xlsx",
+        filetypes=[("Arquivo Excel", "*.xlsx")],
+        title="Salvar Arquivo",
+        initialfile="dados_extraidos.xlsx"
+    )
+
+    if arquivo_saida:
+        salvar_dados_excel(dados, arquivo_saida)
+        messagebox.showinfo("Sucesso", f"Arquivo salvo em:\n{arquivo_saida}")
+        status_label.config(text="Processo concluído!", fg="green")
+
+# Criando elementos da interface
+frame_topo = tk.Frame(root)
+frame_topo.pack(fill="x", pady=5)
+
+btn_selecionar = tk.Button(frame_topo, text="Selecionar PDF", command=selecionar_arquivo, **btn_style)
+btn_selecionar.pack()
+btn_extrair = tk.Button(root, text="Extrair Dados", command=extrair_dados, **btn_style)
+btn_extrair.pack(pady=10)
+
+canvas = tk.Canvas(root, width=700, height=500, bg="white")
+canvas.pack(pady=10)
+
+frame_controles = tk.Frame(root)
+frame_controles.pack()
+
+btn_anterior = tk.Button(frame_controles, text="◀ Página Anterior", command=pagina_anterior, **btn_style)
+btn_anterior.grid(row=0, column=0, padx=5)
+
+label_pagina = tk.Label(frame_controles, text="Página 0 de 0", font=("Arial", 12))
+label_pagina.grid(row=0, column=1, padx=5)
+
+btn_proxima = tk.Button(frame_controles, text="Próxima Página ▶", command=proxima_pagina, **btn_style)
+btn_proxima.grid(row=0, column=2, padx=5)
+
+progress_bar = ttk.Progressbar(root, mode="indeterminate", length=300)
+progress_bar.pack(pady=5)
+
+status_label = tk.Label(root, text="", font=("Arial", 10))
+status_label.pack()
+
+lbl_credito = tk.Label(root, text="Desenvolvido por Lucas Augusto", fg="gray", font=("Arial", 9))
+lbl_credito.pack(side="bottom", pady=10)
+
+root.mainloop()

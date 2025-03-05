@@ -1,46 +1,70 @@
-import fitz  # PyMuPDF
+import pdfplumber
 import re
 
-def extract_data(pdf_path):
-    """Extrai os campos necessários do PDF e suas coordenadas."""
-    doc = fitz.open(pdf_path)
-    extracted_info = []
+def extrair_dados_pdf(caminho_pdf):
+    dados_extraidos = []
 
-    for page in doc:
-        text = page.get_text("text")
-        
-        # Expressões regulares para capturar os campos
-        os_number = re.search(r"Nº da OS:\s*(\d+)", text)
-        setor_match = re.search(r"Setor:\s*(.*?)\s*Oficina:", text)
-        aberta_em = re.search(r"Aberta em (\d{2}/\d{2}/\d{4} \d{2}:\d{2})", text)
-        fechada_em = re.search(r"Fechada em (\d{2}/\d{2}/\d{4} \d{2}:\d{2})", text)
-        observacao_match = re.search(r"Observação:\s*(.*)", text, re.DOTALL)
+    # Abrir o PDF com pdfplumber
+    with pdfplumber.open(caminho_pdf.name) as pdf:
+        for i, pagina in enumerate(pdf.pages):
+            texto = pagina.extract_text()
+            print(f"\n--- Página {i+1} ---\n{texto}\n")  # Exibir o conteúdo extraído
 
-        # Ajuste do setor para remover informações extras
-        setor = setor_match.group(1).split(" Prioridade:")[0] if setor_match else ""
+            if not texto:
+                print(f"⚠ Nenhum texto extraído na página {i+1}")
+                continue
+            
+            linhas = texto.split("\n")
+            registro_atual = {}
 
-        # Capturar coordenadas dos campos
-        coords = {}
-        for field, regex in {
-            "Nº da OS": os_number,
-            "Setor": setor_match,
-            "Aberta em": aberta_em,
-            "Fechada em": fechada_em,
-            "Observação": observacao_match
-        }.items():
-            if regex:
-                rects = page.search_for(regex.group(0))
-                if rects:
-                    coords[field] = rects[0]
+            for linha in linhas:
+                print(f"📌 Linha: {linha}")  # Ver o que está sendo lido
 
-        # Salvar dados extraídos
-        extracted_info.append({
-            "Nº da OS": os_number.group(1) if os_number else "",
-            "Setor": setor,
-            "Aberta em": aberta_em.group(1) if aberta_em else "",
-            "Fechada em": fechada_em.group(1) if fechada_em else "",
-            "Observação": observacao_match.group(1).strip() if observacao_match else "",
-            "coords": coords  # Coordenadas para destaque visual
-        })
+                if "TÉCNICO RESPONSÁVEL" in linha:
+                    break
 
-    return extracted_info
+                match_os = re.search(r"Nº da OS:\s*(\d{9})", linha)
+                if match_os:
+                    if registro_atual:
+                        dados_extraidos.append(registro_atual)
+                    registro_atual = {
+                        "Nº da OS": match_os.group(1),
+                        "Setor": "",
+                        "Aberta em": "",
+                        "Fechada em": "",
+                        "Observação": ""
+                    }
+                
+                match_setor = re.search(r"Setor:\s*(.+)", linha)
+                if match_setor:
+                    setor = match_setor.group(1).strip()
+                    # Alteração aqui: Remover texto após a palavra "Prioridade"
+                    if "Prioridade" in setor:
+                        setor = setor.split("Prioridade")[0].strip()
+                    registro_atual["Setor"] = setor
+                
+                match_aberta = re.search(r"Aberta em\s*([\d/]+\s[\d:]+)", linha)
+                match_fechada = re.search(r"Fechada em\s*([\d/]+\s[\d:]+)", linha)
+
+                if match_aberta:
+                    registro_atual["Aberta em"] = match_aberta.group(1)
+                
+                if match_fechada:
+                    registro_atual["Fechada em"] = match_fechada.group(1)
+
+                if "Observação:" in linha:
+                    observacao = linha.split("Observação:")[-1].strip()
+                    if "itens" in observacao:
+                        observacao = observacao.split("itens")[0].strip()
+                    registro_atual["Observação"] = observacao
+                elif registro_atual.get("Observação"):  
+                    linha_observacao = linha.strip()
+                    if "itens" in linha_observacao:
+                        linha_observacao = linha_observacao.split("itens")[0].strip()
+                    registro_atual["Observação"] += " " + linha_observacao
+
+            if registro_atual:
+                dados_extraidos.append(registro_atual)
+
+    print(f"✅ Dados extraídos: {dados_extraidos}")  # Verificar os dados extraídos
+    return dados_extraidos
