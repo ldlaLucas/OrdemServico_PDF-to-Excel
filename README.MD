@@ -9,6 +9,8 @@ Este é um aplicativo desenvolvido para extrair informações específicas de ar
 - 📊 **Exportação para Excel**.
 - 🖱️ **Interface gráfica simples e intuitiva**.
 - 📂 **Escolha do arquivo de entrada e nome do arquivo de saída**.
+- 📷 **Exibição de miniatura do PDF carregado**.
+- 🔴 **Destaque em tempo real do campo sendo lido durante a leitura do PDF**.
 
 ## 🛠️ Como Usar
 
@@ -104,4 +106,3 @@ Sinta-se à vontade para abrir issues e pull requests! 😃
 ---
 
 ✍️ **Desenvolvido por Lucas Augusto**
-
