@@ -66,7 +66,7 @@ def exibir_pagina():
         return
 
     imagem = imagens_paginas[pagina_atual]
-    imagem.thumbnail((700, 500))  # Ajuste para exibição
+    imagem.thumbnail((420, 595))  # Ajuste para exibição
     img_tk = ImageTk.PhotoImage(imagem)
 
     canvas.delete("all")
