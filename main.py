@@ -13,7 +13,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 # Criando a janela principal
 root = tk.Tk()
 root.title("Extrator de Ordens de Serviço")
-root.geometry("800x650")
+root.geometry("595x842")
 root.resizable(False, False)
 
 # Variáveis globais
@@ -66,7 +66,7 @@ def exibir_pagina():
         return
 
     imagem = imagens_paginas[pagina_atual]
-    imagem.thumbnail((420, 595))  # Ajuste para exibição
+    imagem.thumbnail((595,1000 ))  # Ajuste para exibição
     img_tk = ImageTk.PhotoImage(imagem)
 
     canvas.delete("all")
